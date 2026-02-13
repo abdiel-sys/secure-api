@@ -11,7 +11,7 @@ class UserSchema(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-@app.route('/register', methods=['POST'])
+@app.route('/registro', methods=['POST'])
 def register_user():
     try:
         user = UserSchema(**request.json)
