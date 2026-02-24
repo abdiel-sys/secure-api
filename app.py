@@ -3,6 +3,7 @@ import sqlite3
 import bcrypt
 from pydantic import BaseModel, ValidationError, EmailStr, ConfigDict, Field
 from flask import Flask, jsonify, request
+import jwt
 
 app = Flask(__name__)
 
@@ -37,13 +38,15 @@ def login():
         conn = sqlite3.connect("userdata.db")
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, password FROM usuarios WHERE email =?", (user.email,)
+            "SELECT id, password, role FROM usuarios WHERE email =?", (user.email,)
         )
         data = cursor.fetchone()
         if data:
             password = user.password.encode("utf-8")
             if bcrypt.checkpw(password, data[1]):
-                return jsonify({"SUCCESS 201": "Iniciaste sesion"})
+                key = "llave totalmente secreta"
+                encoded = jwt.encode({"role": data[2]}, key, algorithm="HS256")
+                return jsonify({"SUCCESS 201": "Iniciaste sesion", "jwt": encoded})
             else:
                 return jsonify({"Error": "Contrasenas no coninciden"})
 
