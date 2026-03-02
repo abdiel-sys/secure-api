@@ -1,9 +1,11 @@
-import email_validator
+import datetime
 import sqlite3
 import bcrypt
 from pydantic import BaseModel, ValidationError, EmailStr, ConfigDict, Field
 from flask import Flask, jsonify, request
 import jwt
+from datetime import timezone
+from config import Config
 
 app = Flask(__name__)
 
@@ -41,17 +43,26 @@ def login():
             "SELECT id, password, role FROM usuarios WHERE email =?", (user.email,)
         )
         data = cursor.fetchone()
-        if data:
-            password = user.password.encode("utf-8")
-            if bcrypt.checkpw(password, data[1]):
-                key = "llave totalmente secreta"
-                encoded = jwt.encode({"role": data[2]}, key, algorithm="HS256")
-                return jsonify({"SUCCESS 201": "Iniciaste sesion", "jwt": encoded})
-            else:
-                return jsonify({"Error": "Contrasenas no coninciden"})
-
-        else:
+        if not data:
             return jsonify({"ERROR": "Usuario no existe"})
+
+        password = user.password.encode("utf-8")
+        if bcrypt.checkpw(password, data[1]):
+            payload = {
+                "user_id": data[0],
+                "email": user.email,
+                "role": data[2],
+                "exp": datetime.datetime.now(tz=timezone.utc)
+                + datetime.timedelta(hours=2),
+            }
+            encoded = jwt.encode(
+                payload,
+                Config.SECRET_KEY,
+                Config.JWT_ALGORITHM,
+            )
+            return jsonify({"SUCCESS 201": "Iniciaste sesion", "Token": encoded})
+        else:
+            return jsonify({"Error": "Contraseñas no coinciden"})
 
     except sqlite3.Error as error:
         print(error)
