@@ -1,12 +1,10 @@
 from flask import Blueprint, jsonify, request
-from datetime import timezone
 import datetime
 import bcrypt
-import jwt
 import sqlite3
-from config import Config
 from db import get_db_connection
 from pydantic import BaseModel, ValidationError, EmailStr, ConfigDict, Field
+from flask_jwt_extended import create_access_token
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -39,18 +37,14 @@ def login():
     password_input = user.password.encode("utf-8")
 
     if bcrypt.checkpw(password_input, hash_db):
-        payload = {
-            "user_id": data["id"],
-            "email": data["email"],
-            "role": data["role"],
-            "exp": datetime.datetime.now(timezone.utc) + datetime.timedelta(hours=24),
-            "iat": datetime.datetime.now(timezone.utc),
-        }
-
-        token = jwt.encode(payload, Config.SECRET_KEY, algorithm=Config.JWT_ALGORITHM)
+        access_token = create_access_token(
+            identity=str(data["id"]),
+            additional_claims={"email": data["email"], "role": data["role"]},
+            expires_delta=datetime.timedelta(hours=24),
+        )
 
         return jsonify(
-            {"SUCCESS 201": "Bienvenido a la aplicación", "token": token}
+            {"SUCCESS 201": "Bienvenido a la aplicación", "token": access_token}
         ), 201
     else:
         return jsonify({"ERRROR": "Credenciales inválidas"}), 401
