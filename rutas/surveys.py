@@ -45,7 +45,6 @@ def create_survey():
 
     survey_id = cursor.lastrowid
 
-    # Optional: insert questions
     if hasattr(data, "questions") and data.questions:
         for q in data.questions:
             cursor.execute(

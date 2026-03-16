@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 import datetime
 import bcrypt
 import sqlite3
@@ -20,14 +20,15 @@ class UserSchema(BaseModel):
 def login():
     try:
         user = UserSchema(**request.json)
-    except ValidationError:
+    except ValidationError as e:
+        current_app.logger.warning(f"Error de validacion {request.remote_addr}: {e}")
         return jsonify({"ERROR 400": "Credenciales Invalidas"}), 400
 
     conn = get_db_connection()
     data = conn.execute("SELECT * FROM users WHERE email = ?", (user.email,)).fetchone()
     conn.close()
-
     if not data:
+        current_app.logger.info(f"Usuario no existe desde: {request.remote_addr}")
         return jsonify({"ERROR": "Usuario no existe"})
 
     hash_db = data["password"]
@@ -43,10 +44,13 @@ def login():
             expires_delta=datetime.timedelta(hours=24),
         )
 
+        current_app.logger.info(f"Login exitoso de: {request.remote_addr}")
         return jsonify(
             {"SUCCESS 201": "Bienvenido a la aplicación", "token": access_token}
         ), 201
     else:
+        current_app.logger.warning(f"Credenciales inválidas de {request.remote_addr}")
+
         return jsonify({"ERRROR": "Credenciales inválidas"}), 401
 
 
@@ -54,7 +58,8 @@ def login():
 def registro():
     try:
         user = UserSchema(**request.json)
-    except ValidationError:
+    except ValidationError as e:
+        current_app.logger.warning(f"Error de validacion {request.remote_addr}: {e}")
         return jsonify({"ERROR 400": "Credenciales Invalidas"}), 400
     try:
         conn = get_db_connection()
@@ -64,6 +69,9 @@ def registro():
         data = cursor.fetchall()
         for row in data:
             if row[0] == user.email:
+                current_app.logger.warning(
+                    f"Correo ya existe: {user.email} desde {request.remote_addr}"
+                )
                 return jsonify({"ERROR 409": "El usuario ya existe"}), 409
 
         bpassword = user.password.encode("utf-8")
@@ -76,8 +84,7 @@ def registro():
         )
         conn.commit()
         conn.close()
-    except sqlite3.Error as e:
-        print(e)
+    except sqlite3.Error:
         return jsonify({"ERROR 500": "Error en el servidor"}), 500
 
     return jsonify({"SUCCESS 201": "Usuario Registrado"}), 201
