@@ -13,9 +13,9 @@ app = Flask(__name__)
 # -----------------------------
 # Configure Logging
 # -----------------------------
-handler = RotatingFileHandler("app.log", maxBytes=1000000, backupCount=5)
+handler = RotatingFileHandler("api_activity.log", maxBytes=1000000, backupCount=5)
 
-handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+handler.setFormatter(logging.Formatter("[%(asctime)s] | [%(levelname)s] | [%(message)s]"))
 
 handler.setLevel(logging.DEBUG)
 

@@ -24,6 +24,7 @@ def login():
         current_app.logger.warning(f"Error de validacion {request.remote_addr}: {e}")
         return jsonify({"ERROR 400": "Credenciales Invalidas"}), 400
 
+    current_app.logger.debug(f"Consultando DB para el email: {user.email}")
     conn = get_db_connection()
     data = conn.execute("SELECT * FROM users WHERE email = ?", (user.email,)).fetchone()
     conn.close()
@@ -62,6 +63,7 @@ def registro():
         current_app.logger.warning(f"Error de validacion {request.remote_addr}: {e}")
         return jsonify({"ERROR 400": "Credenciales Invalidas"}), 400
     try:
+        current_app.logger.debug("Consultando DB para registro (verificando email)")
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT email FROM users")
@@ -78,13 +80,16 @@ def registro():
         salt = bcrypt.gensalt()
         hash_password = bcrypt.hashpw(bpassword, salt)
 
+        current_app.logger.debug(f"Insertando nuevo usuario en DB: {user.email}")
         cursor.execute(
             "INSERT INTO users (email, password) VALUES (?, ?)",
             (user.email, hash_password),
         )
         conn.commit()
         conn.close()
-    except sqlite3.Error:
+    except sqlite3.Error as e:
+        current_app.logger.error(f"Error de base de datos durante el registro: {str(e)}")
         return jsonify({"ERROR 500": "Error en el servidor"}), 500
 
+    current_app.logger.info(f"Usuario registrado exitosamente: {user.email}")
     return jsonify({"SUCCESS 201": "Usuario Registrado"}), 201
