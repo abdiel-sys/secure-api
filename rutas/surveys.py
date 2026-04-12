@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from pydantic import BaseModel, ValidationError
 from db import get_db_connection
@@ -32,6 +32,7 @@ def create_survey():
     try:
         data = SurveyCreate(**request.get_json())
     except ValidationError as e:
+        current_app.logger.warning(f"Error de validacion {request.remote_addr}: {e}")
         return jsonify(e.errors()), 400
 
     user_id = int(get_jwt_identity())
@@ -55,13 +56,13 @@ def create_survey():
     conn.commit()
     conn.close()
 
+    current_app.logger.info(f"Encuesta creada exitosamente de: {request.remote_addr}")
     return jsonify(
         {"message": "Encuesta creada correctamente", "survey_id": survey_id}
     ), 201
 
 
 @survey_bp.route("/surveys", methods=["GET"])
-@jwt_required()
 def get_surveys():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -71,6 +72,30 @@ def get_surveys():
     conn.close()
 
     return jsonify([dict(row) for row in surveys])
+
+
+@survey_bp.route("/surveys/<int:survey_id>", methods=["GET"])
+def get_survey(survey_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    survey = cursor.execute(
+        "SELECT id, title, created_by FROM surveys WHERE id = ?", (survey_id,)
+    ).fetchone()
+    if not survey:
+        conn.close()
+        return jsonify({"ERROR": "Encuesta no encontrada"}), 404
+
+    questions = cursor.execute(
+        "SELECT id, question FROM questions WHERE survey_id = ?", (survey_id,)
+    ).fetchall()
+
+    survey_data = dict(survey)
+    survey_data["questions"] = [dict(q) for q in questions]
+
+    conn.close()
+
+    return jsonify(survey_data)
 
 
 @survey_bp.route("/surveys/<int:survey_id>/questions", methods=["POST"])
@@ -112,6 +137,7 @@ def submit_responses(survey_id):
     try:
         data = SurveyResponse(**request.get_json())
     except ValidationError as e:
+        current_app.logger.warning(f"Error de validacion {request.remote_addr}: {e}")
         return jsonify(e.errors()), 400
 
     user_id = get_jwt_identity()
@@ -134,7 +160,6 @@ def submit_responses(survey_id):
 
 
 @survey_bp.route("/surveys/<int:survey_id>/results", methods=["GET"])
-@jwt_required()
 def get_results(survey_id):
 
     conn = get_db_connection()
