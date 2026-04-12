@@ -77,4 +77,4 @@ def handle_exception(e):
 if __name__ == "__main__":
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         app.logger.info("Starting Flask API")
-    app.run(debug=True, port=5000)
+    app.run(debug=False, port=5000)
